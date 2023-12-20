@@ -5,7 +5,7 @@ import csv
 results = []
 
 def get_group_directories(parent_directory):
-    """Gibt eine Liste der Verzeichnisse im übergeordneten Verzeichnis zurück."""
+    #Gibt eine Liste der Verzeichnisse im übergeordneten Verzeichnis zurück.
     return [dir for dir in os.listdir(parent_directory) if os.path.isdir(os.path.join(parent_directory, dir))]
 
 def swap_test_directories(parent_directory):
