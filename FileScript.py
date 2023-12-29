@@ -1,76 +1,87 @@
 import os
+import shutil
 import subprocess
 import csv
+import logging
+from typing import List, Tuple
 
-results = []
 
-def get_group_directories(parent_directory):
-    #Gibt eine Liste der Verzeichnisse im übergeordneten Verzeichnis zurück.
-    return [dir for dir in os.listdir(parent_directory) if os.path.isdir(os.path.join(parent_directory, dir))]
+# Konfigurieren des Loggings
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def swap_test_directories(parent_directory):
-    groups = get_group_directories(parent_directory)
-    for i in range(len(groups)):
-        for j in range(len(groups)):
-            if i != j:  # Vermeiden Sie, dass eine Gruppe mit sich selbst gepaart wird
-                group1 = groups[i]
-                group2 = groups[j]
 
-                # Pfade zu den Testordnern und Backup-Ordnern
-                test_dir_1 = os.path.join(parent_directory, group1, "test")
-                test_dir_2 = os.path.join(parent_directory, group2, "test")
-                backup_dir_1 = os.path.join(parent_directory, group1, "test_backup")
-                backup_dir_2 = os.path.join(parent_directory, group2, "test_backup")
+def get_group_directories(parent_directory: str) -> List[str]:
+    # Gibt eine Liste der Verzeichnisse im übergeordneten Verzeichnis zurück.
+    try:
+        return [dir for dir in os.listdir(parent_directory) if os.path.isdir(os.path.join(parent_directory, dir))]
+    except FileNotFoundError:
+        logging.error(f"Verzeichnis {parent_directory} nicht gefunden.")
+        return []
 
-                # Testordner in Backup umbenennen und austauschen
-                os.rename(test_dir_1, backup_dir_1)
-                os.rename(test_dir_2, backup_dir_2)
-                os.rename(backup_dir_1, test_dir_2)
-                os.rename(backup_dir_2, test_dir_1)
+def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str, str, int, int]:
+    # Führt die Tests mit vertauschten Testverzeichnissen aus und stellt die ursprüngliche Struktur wieder her."""
+    test_dir_1 = os.path.join(parent_directory, group1, "test")
+    test_dir_2 = os.path.join(parent_directory, group2, "test")
+    backup_dir_1 = test_dir_1 + "_backup"
 
-                #Subprocess für ausführung von mvn verify, cwd=i damit wir im jeweiligen Ordner sind und standard ausgabe damit wir alle ergebnisse der pipe bekommen
-                process = subprocess.Popen(["mvn", "verify"], cwd=i, stdout=subprocess.PIPE)
-                output, error = process.communicate()
-                
-                #ToDO: Output parsen, damit wir success und failure speichern können
-                success_count, failure_count = parse_maven_output(output)
-                
-                #Outputs zusammenfügen, i und j sind die Gruppen die getestet wurden (fyi verwirrung)
-                results.append({"Group": i, "TestedBy": j, "Success": success_count, "Failures": failure_count})
-                
-                # Stellen Sie die ursprüngliche Ordnerstruktur wieder her
-                os.rename(test_dir_2, backup_dir_2)
-                os.rename(test_dir_1, backup_dir_1)
-                os.rename(backup_dir_2, test_dir_2)
-                os.rename(backup_dir_1, test_dir_1)
+    try:
+        # Sichern und Austauschen der Testordner
+        shutil.move(test_dir_1, backup_dir_1)
+        shutil.copytree(test_dir_2, test_dir_1, dirs_exist_ok=True)
 
-# Ergebnisse in CSV-Datei schreiben
-with open('test_results.csv', 'w', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=["Group", "TestedBy", "Success", "Failures"])
-    writer.writeheader()
-    writer.writerows(results)
+        # Maven-Tests ausführen
+        process = subprocess.Popen(["mvn", "verify"], cwd=os.path.join(parent_directory, group1), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output, error = process.communicate()
 
-#ToDo Parse Maven Output
-def parse_maven_output(output):
+        # Output parsen
+        success_count, failure_count = parse_maven_output(output.decode('utf-8').split('\n'))
+
+    except Exception as e:
+        logging.error(f"Fehler bei der Ausführung der Tests zwischen {group1} und {group2}: {e}")
+        success_count, failure_count = 0, 0
+
+    finally:
+        # Ursprüngliche Ordnerstruktur wiederherstellen
+        if os.path.exists(backup_dir_1):
+            shutil.rmtree(test_dir_1)
+            shutil.move(backup_dir_1, test_dir_1)
+
+    return group1, group2, success_count, failure_count
+
+def parse_maven_output(output_lines: List[str]) -> Tuple[int, int]:
     success_count = 0
     failure_count = 0
-    #Nicht sicher ob das funktioniert, aber grundsätzlich gehen wir zeile für zeile den output durch und suchen nach 'Tests run:', teilen die zeile jeweils immer an den kommas und nehmen dann den zweiten teil der Zeile und berechnen dann success und failure count
-    for zeile in output:
-        if 'Tests run:' in zeile:
-            parts = zeile.split(',')
+    for line in output_lines:
+        if 'Tests run:' in line:
+            parts = line.split(',')
             runs = int(parts[0].split(':')[1].strip())
             failures = int(parts[1].split(':')[1].strip())
             errors = int(parts[2].split(':')[1].strip())
             skipped = int(parts[3].split(':')[1].strip())
-            
             success_count = runs - failures - errors - skipped
             failure_count = failures + errors + skipped
-            
+
     return success_count, failure_count
-    
-# Pfad zum übergeordneten Verzeichnis, das die Gruppenordner enthält, beim Testen jeweiliges Directory anpassen hier unten
-parent_directory = r"C:\Uni\Master\Semester 1\SQA\script\TestProjekte"
 
-swap_test_directories(parent_directory)
+def write_results_to_csv(results: List[dict], filename: str):
+    # Schreibt die Ergebnisse in eine CSV-Datei
+    with open(filename, 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=["Group", "TestedBy", "Success", "Failures"])
+        writer.writeheader()
+        writer.writerows(results)
 
+def main(parent_directory: str):
+    results = []
+    groups = get_group_directories(parent_directory)
+    for i, group1 in enumerate(groups):
+        for j, group2 in enumerate(groups):
+            if i != j:
+                result = swap_and_test(parent_directory, group1, group2)
+                results.append({"Group": result[0], "TestedBy": result[1], "Success": result[2], "Failures": result[3]})
 
+    write_results_to_csv(results, 'test_results.csv')
+
+if __name__ == "__main__":
+    # Pfad zum übergeordneten Verzeichnis, das die Gruppenordner enthält, beim Testen jeweiliges Directory anpassen hier unten
+    parent_directory = r"C:\Uni\Master\Semester 1\SQA\script\TestProjekte"
+    main(parent_directory)
