@@ -3,7 +3,7 @@ import shutil
 import subprocess
 import csv
 import logging
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 # Konfigurieren des Loggings
@@ -17,15 +17,43 @@ def get_group_directories(parent_directory: str) -> List[str]:
     except FileNotFoundError:
         logging.error(f"Verzeichnis {parent_directory} nicht gefunden.")
         return []
+    
+def find_test_directory(project_src_directory: str, group: str) -> Optional[str]:
+    # Sucht nach dem Testverzeichnis, das 'test' im Namen enthält, und loggt, wenn es umbenannt wurde
+    test_directory = None
+    for item in os.listdir(project_src_directory):
+        if os.path.isdir(os.path.join(project_src_directory, item)) and 'test' in item:
+            test_directory = os.path.join(project_src_directory, item)
+            if item != 'test':
+                logging.warning(f"Testverzeichnis für Gruppe {group} wurde zu '{item}' umbenannt.")
+            break
+    if test_directory is None:
+        logging.error(f"Kein Testverzeichnis für Gruppe {group} gefunden.")
+    return test_directory
 
 def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str, str, int, int]:
     # Führt die Tests mit vertauschten Testverzeichnissen aus und stellt die ursprüngliche Struktur wieder her
-    project_dir_1 = os.path.join(parent_directory, group1, 'semester_project-main')
-    project_dir_2 = os.path.join(parent_directory, group2, 'semester_project-main')
 
-    test_dir_1 = os.path.join(project_dir_1, "test")
-    test_dir_2 = os.path.join(project_dir_2, "test")
+    # Pfad zum Maven-Projektverzeichnis
+    project_dir_1 = os.path.join(parent_directory, group1, 'semester-project-main')
+    project_dir_2 = os.path.join(parent_directory, group2, 'semester-project-main')
+
+    # Pfad zum src-Verzeichnis
+    src_dir_1 = os.path.join(parent_directory, group1, 'semester-project-main', 'src')
+    src_dir_2 = os.path.join(parent_directory, group2, 'semester-project-main', 'src')
+
+    # Finde die Testverzeichnisse, wenn sie vorhanden sind
+    test_dir_1 = find_test_directory(src_dir_1, group1)
+    test_dir_2 = find_test_directory(src_dir_2, group2)
+
+    # Wenn ein Testverzeichnis nicht gefunden wurde, logge den Vorfall und überspringe die Gruppe
+    if not test_dir_1 or not test_dir_2:
+        return group1, group2, 0, 0
+    
     backup_dir_1 = test_dir_1 + "_backup"
+
+    # Wähle den Maven Wrapper basierend auf dem Betriebssystem
+    mvn_command = './mvnw' if os.name != 'nt' else 'mvnw.cmd'
 
     try:
         # Sichern und Austauschen der Testordner
@@ -33,7 +61,7 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
         shutil.copytree(test_dir_2, test_dir_1, dirs_exist_ok=True)
 
         # Maven-Tests ausführen
-        process = subprocess.Popen(["mvn", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen([mvn_command, "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output, error = process.communicate()
 
         # Output parsen
