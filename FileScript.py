@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 
 def get_group_directories(parent_directory: str) -> List[str]:
-    # Gibt eine Liste der Verzeichnisse im übergeordneten Verzeichnis zurück.
+    # Gibt eine Liste der Verzeichnisse im übergeordneten Verzeichnis zurück
     try:
         return [dir for dir in os.listdir(parent_directory) if os.path.isdir(os.path.join(parent_directory, dir))]
     except FileNotFoundError:
@@ -19,9 +19,12 @@ def get_group_directories(parent_directory: str) -> List[str]:
         return []
 
 def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str, str, int, int]:
-    # Führt die Tests mit vertauschten Testverzeichnissen aus und stellt die ursprüngliche Struktur wieder her."""
-    test_dir_1 = os.path.join(parent_directory, group1, "test")
-    test_dir_2 = os.path.join(parent_directory, group2, "test")
+    # Führt die Tests mit vertauschten Testverzeichnissen aus und stellt die ursprüngliche Struktur wieder her
+    project_dir_1 = os.path.join(parent_directory, group1, 'semester_project-main')
+    project_dir_2 = os.path.join(parent_directory, group2, 'semester_project-main')
+
+    test_dir_1 = os.path.join(project_dir_1, "test")
+    test_dir_2 = os.path.join(project_dir_2, "test")
     backup_dir_1 = test_dir_1 + "_backup"
 
     try:
@@ -30,7 +33,7 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
         shutil.copytree(test_dir_2, test_dir_1, dirs_exist_ok=True)
 
         # Maven-Tests ausführen
-        process = subprocess.Popen(["mvn", "verify"], cwd=os.path.join(parent_directory, group1), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(["mvn", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output, error = process.communicate()
 
         # Output parsen
@@ -83,5 +86,5 @@ def main(parent_directory: str):
 
 if __name__ == "__main__":
     # Pfad zum übergeordneten Verzeichnis, das die Gruppenordner enthält, beim Testen jeweiliges Directory anpassen hier unten
-    parent_directory = r"C:\Uni\Master\Semester 1\SQA\script\TestProjekte"
+    parent_directory = "/path/to/your/parent_directory"
     main(parent_directory)
