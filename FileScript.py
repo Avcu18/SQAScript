@@ -68,12 +68,9 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
 
     # Wenn ein Testverzeichnis nicht gefunden wurde, logge den Vorfall und überspringe die Gruppe
     if not test_dir_1 or not test_dir_2:
-        return group1, group2, 0, 0
+        return group1, group2, 0, 0, 0, 0, 0
     
     backup_dir_1 = test_dir_1 + "_backup"
-
-    # Wähle den Maven Wrapper basierend auf dem Betriebssystem
-    # mvn_command = './mvnw' if os.name != 'nt' else 'mvnw.cmd'
 
     try:
         # Sichern und Austauschen der Testordner
@@ -81,15 +78,17 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
         shutil.copytree(test_dir_2, test_dir_1, dirs_exist_ok=True)
 
         # Maven-Tests ausführen
-        process = subprocess.Popen(["mvn", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(["./mvnw", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output, error = process.communicate()
 
+        logging.info(f"Running Maven in {project_dir_1}")
+
         # Output parsen
-        success_count, failure_count = parse_maven_output(output.decode('utf-8').split('\n'))
+        runs, success_count, failure_count, errors, skipped = parse_maven_output(output.decode('utf-8').split('\n'))
 
     except Exception as e:
         logging.error(f"Fehler bei der Ausführung der Tests zwischen {group1} und {group2}: {e}")
-        success_count, failure_count = 0, 0
+        runs, success_count, failure_count, errors, skipped = 0, 0, 0, 0, 0
 
     finally:
         # Ursprüngliche Ordnerstruktur wiederherstellen
@@ -97,11 +96,10 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
             shutil.rmtree(test_dir_1)
             shutil.move(backup_dir_1, test_dir_1)
 
-    return group1, group2, success_count, failure_count
+    return group1, group2, runs, success_count, failure_count, errors, skipped
 
-def parse_maven_output(output_lines: List[str]) -> Tuple[int, int]:
-    success_count = 0
-    failure_count = 0
+def parse_maven_output(output_lines: List[str]) -> Tuple[int, int, int, int, int]:
+    runs, failures, errors, skipped = 0, 0, 0, 0
     for line in output_lines:
         if 'Tests run:' in line:
             parts = line.split(',')
@@ -110,16 +108,27 @@ def parse_maven_output(output_lines: List[str]) -> Tuple[int, int]:
             errors = int(parts[2].split(':')[1].strip())
             skipped = int(parts[3].split(':')[1].strip())
             success_count = runs - failures - errors - skipped
-            failure_count = failures + errors + skipped
+            failure_count = failures + errors
 
-    return success_count, failure_count
+    return runs, success_count, failure_count, errors, skipped
 
 def write_results_to_csv(results: List[dict], filename: str):
-    # Schreibt die Ergebnisse in eine CSV-Datei
+    # Schreibt die Ergebnisse in eine CSV-Datei, erweitert um zusätzliche Felder
+    fieldnames = ["Group", "TestedBy", "Runs", "Success", "Failures", "Errors", "Skipped"]
     with open(filename, 'w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=["Group", "TestedBy", "Success", "Failures"])
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(results)
+        for result in results:
+            row = {
+                "Group": result["Group"],
+                "TestedBy": result["TestedBy"],
+                "Runs": result["Runs"],
+                "Success": result["Success"],
+                "Failures": result["Failures"],
+                "Errors": result["Errors"],
+                "Skipped": result["Skipped"]
+            }
+            writer.writerow(row)
 
 def main(parent_directory: str):
     results = []
@@ -127,8 +136,17 @@ def main(parent_directory: str):
     for i, group1 in enumerate(groups):
         for j, group2 in enumerate(groups):
             if i != j:
-                result = swap_and_test(parent_directory, group1, group2)
-                results.append({"Group": result[0], "TestedBy": result[1], "Success": result[2], "Failures": result[3]})
+                group1, group2, runs, success_count, failure_count, errors, skipped = swap_and_test(parent_directory, group1, group2)
+                
+                results.append({
+                    "Group": group1, 
+                    "TestedBy": group2, 
+                    "Runs": runs, 
+                    "Success": success_count, 
+                    "Failures": failure_count, 
+                    "Errors": errors, 
+                    "Skipped": skipped
+                })
 
     write_results_to_csv(results, 'test_results.csv')
 
