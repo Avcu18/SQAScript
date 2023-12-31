@@ -53,6 +53,8 @@ def get_subdirectory_name(parent_directory: str, group1: str, group2: str) -> Op
 def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str, str, int, int]:
     # Führt die Tests mit vertauschten Testverzeichnissen aus und stellt die ursprüngliche Struktur wieder her
     
+    runs = success_count = failure_count = errors = skipped = 0
+
     name1, name2 = get_subdirectory_name(parent_directory, group1, group2)
     # Pfad zum Maven-Projektverzeichnis <pom.xml vorhanden>
     project_dir_1 = os.path.join(parent_directory, group1, name1)
@@ -77,11 +79,13 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
         shutil.move(test_dir_1, backup_dir_1)
         shutil.copytree(test_dir_2, test_dir_1, dirs_exist_ok=True)
 
+        logging.info(f"Running Maven in {group1}")
+
         # Maven-Tests ausführen
         process = subprocess.Popen(["./mvnw", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output, error = process.communicate()
 
-        logging.info(f"Running Maven in {project_dir_1}")
+        logging.info(f"Running Maven done in {group1}")
 
         # Output parsen
         runs, success_count, failure_count, errors, skipped = parse_maven_output(output.decode('utf-8').split('\n'))
