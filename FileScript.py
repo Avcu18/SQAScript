@@ -82,7 +82,7 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
         logging.info(f"Running Maven in {group1}")
 
         # Maven-Tests ausführen
-        process = subprocess.Popen(["./mvnw", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(["mvn", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output, error = process.communicate()
 
         logging.info(f"Running Maven done in {group1}")
