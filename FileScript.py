@@ -82,7 +82,7 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
         logging.info(f"Running Maven in {group1}")
 
         # Maven-Tests ausführen
-        process = subprocess.Popen(["./mvnw", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(["mvn", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output, error = process.communicate()
 
         logging.info(f"Running Maven done in {group1}")
@@ -156,5 +156,5 @@ def main(parent_directory: str):
 
 if __name__ == "__main__":
     # Pfad zum übergeordneten Verzeichnis, das die Gruppenordner enthält, beim Testen jeweiliges Directory anpassen hier unten
-    parent_directory = r"path/to/parent/directory"
+    parent_directory = r"C:\Uni\Master\Semester 1\SQA\TestEnviormentReal"
     main(parent_directory)
