@@ -9,7 +9,6 @@ from typing import List, Tuple, Optional
 # Konfigurieren des Loggings
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 def get_group_directories(parent_directory: str) -> List[str]:
     # Gibt eine Liste der Verzeichnisse im übergeordneten Verzeichnis zurück
     try:
@@ -50,11 +49,11 @@ def get_subdirectory_name(parent_directory: str, group1: str, group2: str) -> Op
 
     return project_name_1, project_name_2
 
-def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str, str, int, int]:
+def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str, str, int, int, int, int, int]:
     # Führt die Tests mit vertauschten Testverzeichnissen aus und stellt die ursprüngliche Struktur wieder her
     
     runs = success_count = failure_count = errors = skipped = 0
-
+    
     name1, name2 = get_subdirectory_name(parent_directory, group1, group2)
     # Pfad zum Maven-Projektverzeichnis <pom.xml vorhanden>
     project_dir_1 = os.path.join(parent_directory, group1, name1)
@@ -82,7 +81,7 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
         logging.info(f"Running Maven in {group1}")
 
         # Maven-Tests ausführen
-        process = subprocess.Popen(["mvn", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(["mvn.cmd", "verify"], cwd=project_dir_1, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         output, error = process.communicate()
 
         logging.info(f"Running Maven done in {group1}")
@@ -104,6 +103,7 @@ def swap_and_test(parent_directory: str, group1: str, group2: str) -> Tuple[str,
 
 def parse_maven_output(output_lines: List[str]) -> Tuple[int, int, int, int, int]:
     runs, failures, errors, skipped = 0, 0, 0, 0
+    success_count, failure_count = 0, 0
     for line in output_lines:
         if 'Tests run:' in line:
             parts = line.split(',')
@@ -156,5 +156,5 @@ def main(parent_directory: str):
 
 if __name__ == "__main__":
     # Pfad zum übergeordneten Verzeichnis, das die Gruppenordner enthält, beim Testen jeweiliges Directory anpassen hier unten
-    parent_directory = r"path/to/parent/directory"
+    parent_directory = r"D:\Uni\Master\SQA\Gruppen"
     main(parent_directory)
